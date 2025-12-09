@@ -1,0 +1,36 @@
+Position                  | My Eval  |Stockfish | Diff    
+------------------------------------------------------------
+starting position         | 0.15     | 0.17     | 0.02    
+tactical #1               | 0.77     | 1.9      | 1.13    
+tactical #2               | 3.65     | 2.97     | 0.68    
+tactical #3               | 1.34     | 1.42     | 0.08    
+positional #1             | 3.71     | 5.17     | 1.46    
+positional #2             | -4.01    | -6.79    | 2.78    
+positional #3             | -0.63    | -0.24    | 0.39    
+pawn structure #1         | -0.18    | 4.48     | 4.66    
+pawn structure #2         | 3.41     | 0.13     | 3.28    
+pawn structure #3         | 4.13     | 4.88     | 0.75    
+king safety #1            | 0.32     | 0.19     | 0.13    
+king safety #2            | -0.08    | 0.38     | 0.46    
+endgame #1                | 1.12     | -0.21    | 1.33    
+endgame #2                | 1.22     | 4.94     | 3.72    
+endgame #3                | 0.68     | 1.67     | 0.99    
+endgame #4                | -0.78    | -4.59    | 3.81    
+white slight +            | -0.36    | 0.14     | 0.5     
+white up a pawn           | 0.14     | -0.06    | 0.2     
+white winning (+knight)   | 0.35     | 0.19     | 0.16    
+black up a bishop         | 3.65     | 6.02     | 2.37    
+exchange sac (R vs N+P)   | 0.11     | 0.12     | 0.01    
+tight mid-game            | 0.81     | 0.39     | 0.42    
+french def (space adv)    | 0.45     | 0.24     | 0.21    
+isolated queen pawn       | 0.58     | 0.28     | 0.3     
+stonewall (closed)        | 3.47     | 5.21     | 1.74    
+castled vs uncastled      | -0.33    | -0.19    | 0.14    
+hanging queen             | -0.35    | 0.02     | 0.37    
+back rank mate threat     | 2.42     | Mate 1   | N/A     
+king centralization       | 0.00     | -0.01    | 0.01    
+lucena position (win)     | 0.38     | 1.89     | 1.51    
+philidor position (draw)  | -0.13    | 0.21     | 0.34    
+------------------------------------------------------------
+average diff: 1.13
+max diff: 4.66

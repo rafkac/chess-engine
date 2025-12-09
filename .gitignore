@@ -1,0 +1,16 @@
+/.vscode/
+/.vscode/*
+
+src/__pycache__/
+src/*.pyc
+src/chess_engine/__pycache__/
+src/chess_engine/*.pyc
+
+src/fens.py
+src/main.py
+src/playground.py
+
+test/__pycache__/
+test/*.pyc
+
+notes.md
