@@ -13,7 +13,9 @@ src/playground.py
 test/__pycache__/
 test/*.pyc
 
+# personal markdown notes
 notes.md
+TODO.md
 
 # macOS system files
 .DS_Store

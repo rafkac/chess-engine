@@ -15,7 +15,7 @@ class SearchEngine:
 
     def order_moves(self, board, moves):
         """
-        Sorts moves to improve Alpha-Beta pruning efficiency.
+        Sorts moves to improve Alpha-Beta pruning
         Order:
         1. Captures (ordered by value difference)
         2. Promotions

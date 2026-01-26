@@ -5,12 +5,14 @@ Python chess engine implementation with `python-chess` library.
 
 
 #### Evaluation function
-- calculates material balance based on positional square tables
-- calculates pieces' mobility and attacks
-- calculates pawn structures
+Evaluation funciton calculates:
+- material balance based on positional square tables
+- pieces' mobility and attacks
+- pawn structures
     * rewards passed pawns
     * punishes isolated and doubled pawns
-- tapered evaluation distinguishes between middle and end-game
+ 
+It uses tapered evaluation formula to distinguish between middle and end-game
 
 #### Search algorithm
 - order moves to explore the most promising lines first
