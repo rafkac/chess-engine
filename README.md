@@ -5,7 +5,7 @@ Python chess engine implementation with `python-chess` library.
 
 
 #### Evaluation function
-Evaluation funciton calculates:
+Static evaluation funciton for a given chess board state. It calculates:
 - material balance based on positional square tables
 - pieces' mobility and attacks
 - pawn structures
