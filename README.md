@@ -1,4 +1,4 @@
-# Chess Engine - Univeristy Final Project
+# Chess Engine - University Final Project
 
 Python chess engine implementation with `python-chess` library.
 
@@ -13,10 +13,10 @@ Python chess engine implementation with `python-chess` library.
 - tapered evaluation distinguishes between middle and end-game
 
 #### Search algorithm
-- order moves to explore most promising lines first
+- order moves to explore the most promising lines first
     - pawn promotions and captures come first with `MVV - LVA` (Most Valuable Victim - Least Valuable Aggressor) formula
 - it speeds up `minimax` algorithm with `alpha-beta pruning`
-- upon reaching depth limit, it runs `quiescence` search to avoid the horizon effect
+- upon reaching the depth limit, it runs `quiescence` search to avoid the horizon effect
 
 ---
 ### How to run
@@ -28,7 +28,7 @@ To run tests against stockfish, install it on your machine and edit engine's pat
 
 ---
 #### Test results
-Tests against stockfish have been run for different chess position scenarios.  
+Tests against stockfish have been run for various chess position scenarios.  
 Test results for each version can be viewed in the `test/` folder.
 
 ---
