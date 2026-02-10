@@ -182,4 +182,4 @@ class SearchEngine:
         # print(f"Depth: {depth} | Nodes: {self.nodes_visited} | Time: {elapsed:.3f}s")
         # print(f"Best Move: {self.best_move} | Score: {best_val:.2f}")
         
-        return self.best_move, best_val
+        return self.best_move, best_val, elapsed
