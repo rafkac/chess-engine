@@ -1,6 +1,10 @@
 import chess
 from chess_engine.evaluator import ClassicEvaluator
 from chess_engine.search import SearchEngine
+# from main import ChessBot
+from chess_engine.evaluator import ClassicEvaluator
+from chess_engine.search import SearchEngine
+from chess_engine.search_timed import SearchEngineTimed
 
 
 def simulate_match(engine_old, engine_new):
@@ -57,23 +61,50 @@ def play_game(white_engine, black_engine, start_fen):
 
 
 if __name__ == "__main__":
-    evaluator_old = ClassicEvaluator()  # old version
-    evaluator_new = ClassicEvaluator()     # new version
+    # evaluator_old = ClassicEvaluator()  # old version
+    # evaluator_new = ClassicEvaluator()     # new version
     
-    engine_old = SearchEngine(evaluator_old)
-    engine_new = SearchEngine(evaluator_new)
+    # engine_old = SearchEngine(evaluator_old)
+    # engine_new = SearchEngine(evaluator_new)
     
-    results = simulate_match(engine_old, engine_new)
+    # results = simulate_match(engine_old, engine_new)
     
-    print(f"Results over {len(openings) * 2} games:")
-    print(f"New engine: {results['new']} wins")
-    print(f"Old engine: {results['old']} wins")
-    print(f"Draws: {results['draws']}")
+    # print(f"Results over {len(openings) * 2} games:")
+    # print(f"New engine: {results['new']} wins")
+    # print(f"Old engine: {results['old']} wins")
+    # print(f"Draws: {results['draws']}")
     
-    # Simple strength indicator
-    if results['new'] > results['old']:
-        print("✓ New version is stronger!")
-    elif results['new'] < results['old']:
-        print("✗ Old version was better")
-    else:
-        print("≈ Similar strength")
+    # # Simple strength indicator
+    # if results['new'] > results['old']:
+    #     print("✓ New version is stronger!")
+    # elif results['new'] < results['old']:
+    #     print("✗ Old version was better")
+    # else:
+    #     print("≈ Similar strength")
+
+
+    # visualise a game against itself in terminal
+    board = chess.Board()
+    evaluator = ClassicEvaluator()
+    search = SearchEngine(evaluator)
+    search_timed = SearchEngineTimed(evaluator)
+
+    while not board.is_game_over():
+        print(board)
+        
+        if board.turn == chess.WHITE:
+            # AI Turn
+            print("-" * 20)
+            print("White bot...")
+            best_move, score, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
+            board.push(best_move)
+            print(f"After {time:.2f}s bot played: {best_move}")
+        else:
+            # AI Turn
+            print("Black bot...")
+            best_move, score, time = search.get_best_move(board, depth=3) # depth limit
+            board.push(best_move)
+            print(f"After {time:.2f}s bot played: {best_move}")
+        
+    print("Game Over!")
+    print(board.outcome())
