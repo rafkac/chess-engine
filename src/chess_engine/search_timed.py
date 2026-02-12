@@ -249,7 +249,7 @@ class SearchEngineTimed:
             move, score = self.search_depth(board, depth)
             
             # If search wasn't interrupted, update best move
-            if not self.stop_search and move is not None:
+            if move is not None:
                 best_move = move
                 best_score = score
                 depth_reached = depth
@@ -264,7 +264,8 @@ class SearchEngineTimed:
         elapsed = time.time() - self.start_time
         print(f"==> Final: {best_move} | Depth: {depth_reached} | Nodes: {self.nodes_visited} | Time: {elapsed:.3f}s")
         
-        return best_move, best_score, elapsed
+        return best_move, best_score, self.nodes_visited, elapsed
+
 
     # Backward compatibility: allow depth-based search
     def get_best_move_depth(self, board, depth=3):
@@ -289,4 +290,4 @@ class SearchEngineTimed:
         print(f"Depth: {depth} | Nodes: {self.nodes_visited} | Time: {elapsed:.3f}s")
         print(f"Best Move: {move} | Score: {score:.2f}")
         
-        return move, score, elapsed
+        return move, score, self.nodes_visited, elapsed

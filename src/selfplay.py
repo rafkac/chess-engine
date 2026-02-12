@@ -89,6 +89,9 @@ if __name__ == "__main__":
     search = SearchEngine(evaluator)
     search_timed = SearchEngineTimed(evaluator)
 
+    white = {'nodes': 0, 'time': 0.0}
+    black = {'nodes': 0, 'time': 0.0}
+
     while not board.is_game_over():
         print(board)
         
@@ -96,15 +99,23 @@ if __name__ == "__main__":
             # AI Turn
             print("-" * 20)
             print("White bot...")
-            best_move, score, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
+
+            best_move, score, nodes, time = search_timed.get_best_move_depth(board, depth=3) # depth limit
+            white['nodes'] += nodes
+            white['time'] += time
             board.push(best_move)
             print(f"After {time:.2f}s bot played: {best_move}")
         else:
             # AI Turn
             print("Black bot...")
-            best_move, score, time = search.get_best_move(board, depth=3) # depth limit
+
+            best_move, score, nodes, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
+            black['nodes'] += nodes
+            black['time'] += time
             board.push(best_move)
             print(f"After {time:.2f}s bot played: {best_move}")
         
     print("Game Over!")
     print(board.outcome())
+    print(f"White: {(white['nodes']/white['time']):.2f} nodes/s  ({white['nodes']} nodes in {white['time']:.2f}s)")
+    print(f"Black: {(black['nodes']/black['time']):.2f} nodes/s  ({black['nodes']} nodes in {black['time']:.2f}s)")
