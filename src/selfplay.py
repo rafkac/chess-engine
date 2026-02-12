@@ -100,7 +100,7 @@ if __name__ == "__main__":
             print("-" * 20)
             print("White bot...")
 
-            best_move, score, nodes, time = search_timed.get_best_move_depth(board, depth=3) # depth limit
+            best_move, score, nodes, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
             white['nodes'] += nodes
             white['time'] += time
             board.push(best_move)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
             # AI Turn
             print("Black bot...")
 
-            best_move, score, nodes, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
+            best_move, score, nodes, time = search_timed.get_best_move_depth(board, depth=5.0) # depth limit
             black['nodes'] += nodes
             black['time'] += time
             board.push(best_move)
