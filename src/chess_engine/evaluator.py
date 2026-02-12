@@ -187,7 +187,38 @@ class ClassicEvaluator:
             chess.ROOK: 512, chess.QUEEN: 936, chess.KING: 0
         }
 
-        # Game phase weights to calculate tapered evaluation
+        # -------------------------------------------------------------------------
+        # one big pieces dictionary for Fast Lookup
+        # -------------------------------------------------------------------------
+        self.tables = {
+            chess.PAWN: {
+                chess.WHITE: {'mg': self.mg_pawn_white, 'eg': self.eg_pawn_white},
+                chess.BLACK: {'mg': self.mg_pawn_black, 'eg': self.eg_pawn_black}
+            },
+            chess.KNIGHT: {
+                chess.WHITE: {'mg': self.mg_knight_white, 'eg': self.eg_knight_white},
+                chess.BLACK: {'mg': self.mg_knight_black, 'eg': self.eg_knight_black}
+            },
+            chess.BISHOP: {
+                chess.WHITE: {'mg': self.mg_bishop_white, 'eg': self.eg_bishop_white},
+                chess.BLACK: {'mg': self.mg_bishop_black, 'eg': self.eg_bishop_black}
+            },
+            chess.ROOK: {
+                chess.WHITE: {'mg': self.mg_rook_white, 'eg': self.eg_rook_white},
+                chess.BLACK: {'mg': self.mg_rook_black, 'eg': self.eg_rook_black}
+            },
+            chess.QUEEN: {
+                chess.WHITE: {'mg': self.mg_queen_white, 'eg': self.eg_queen_white},
+                chess.BLACK: {'mg': self.mg_queen_black, 'eg': self.eg_queen_black}
+            },
+            chess.KING: {
+                chess.WHITE: {'mg': self.mg_king_white, 'eg': self.eg_king_white},
+                chess.BLACK: {'mg': self.mg_king_black, 'eg': self.eg_king_black}
+            }
+        }
+
+
+        # Game phase weights for tapered evaluation
         self.game_phase_inc = {
             chess.PAWN: 0, chess.KNIGHT: 1, chess.BISHOP: 1,
             chess.ROOK: 2, chess.QUEEN: 4, chess.KING: 0
@@ -215,39 +246,18 @@ class ClassicEvaluator:
         # Iterate over all pieces to sum material + PST
         # Note: python-chess piece maps are faster than iterating all 64 squares
         for idx, piece in board.piece_map().items():
-            match (piece.color, piece.piece_type):
-                case (chess.WHITE, chess.PAWN):
-                    mg_table, eg_table = self.mg_pawn_white, self.eg_pawn_white
-                case (chess.BLACK, chess.PAWN):
-                    mg_table, eg_table = self.mg_pawn_black, self.eg_pawn_black
-                case (chess.WHITE, chess.KNIGHT):
-                    mg_table, eg_table = self.mg_knight_white, self.eg_knight_white
-                case (chess.BLACK, chess.KNIGHT):
-                    mg_table, eg_table = self.mg_knight_black, self.eg_knight_black
-                case (chess.WHITE, chess.BISHOP):
-                    mg_table, eg_table = self.mg_bishop_white, self.eg_bishop_white
-                case (chess.BLACK, chess.BISHOP):
-                    mg_table, eg_table = self.mg_bishop_black, self.eg_bishop_black
-                case (chess.WHITE, chess.ROOK):
-                    mg_table, eg_table = self.mg_rook_white, self.eg_rook_white
-                case (chess.BLACK, chess.ROOK):
-                    mg_table, eg_table = self.mg_rook_black, self.eg_rook_black
-                case (chess.WHITE, chess.QUEEN):
-                    mg_table, eg_table = self.mg_queen_white, self.eg_queen_white
-                case (chess.BLACK, chess.QUEEN):
-                    mg_table, eg_table = self.mg_queen_black, self.eg_queen_black
-                case (chess.WHITE, chess.KING):
-                    mg_table, eg_table = self.mg_king_white, self.eg_king_white
-                case (chess.BLACK, chess.KING):
-                    mg_table, eg_table = self.mg_king_black, self.eg_king_black
-            
             pt = piece.piece_type
+            color = piece.color
+
+            # fast dictionary lookup
+            mg_table = self.tables[pt][color]['mg']
+            eg_table = self.tables[pt][color]['eg']
 
             # Calculate score: material + position
             mg_val = self.mg_value[pt] + mg_table[idx]
             eg_val = self.eg_value[pt] + eg_table[idx]
 
-            if piece.color == chess.WHITE:
+            if color == chess.WHITE:
                 mg_score += mg_val
                 eg_score += eg_val
             else:
