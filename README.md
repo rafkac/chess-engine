@@ -17,20 +17,22 @@ It uses tapered evaluation formula to distinguish between middle and end-game
 #### Search algorithm
 - order moves to explore the most promising lines first
     - pawn promotions and captures come first with `MVV - LVA` (Most Valuable Victim - Least Valuable Aggressor) formula
-- it speeds up `minimax` algorithm with `alpha-beta pruning`
-- upon reaching the depth limit, it runs `quiescence` search to avoid the horizon effect
+- move ordering speeds up `minimax` algorithm with `alpha-beta pruning`, cutting off nonsensible moves
+- upon reaching the depth limit, it runs `quiescence` search to avoid the horizon effect (stopping while trading chess pieces)
 
 ---
 ### How to run
 Prerequisites: Python3; libraries: python-chess, Pygame.
 
-To play against the engine clone the repository and run `UI.py` file. The pygame window will pop up.
+To play against the engine in UI clone the repository and run `UI.py` file. The pygame window will pop up.
+
+To play in a console mode, run `main.py`.
 
 To run tests against stockfish, install it on your machine and edit engine's path in the test file.
 
 ---
 #### Test results
-Tests against stockfish have been run for various chess position scenarios.  
+Tests against stockfish have been run for various chess position scenarios to see how often my engine agrees with the stockfish.  
 Test results for each version can be viewed in the `test/` folder.
 
 ---
