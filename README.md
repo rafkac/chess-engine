@@ -35,6 +35,20 @@ To run tests against stockfish, install it on your machine and edit engine's pat
 Tests against stockfish have been run for various chess position scenarios to see how often my engine agrees with the stockfish.  
 Test results for each version can be viewed in the `test/` folder.
 
+
+
+## Future improvements
+Improve the search efficiency to improve nodes per soconds:
+1. Transposition tables (allow IDS to reuse work across depths)
+2. Killer move heuristics
+3. History heuristics
+4. Null move pruning
+5. Late move reductions
+6. Evaluaations caching
+
+Most immediate clear improvement will happen with implementing transposiiton tables
+
+
 ---
 **version 1.0** - basic evaluator (material + PST)  
 **version 1.1** - added mobility bonuses  
