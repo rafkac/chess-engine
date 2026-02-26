@@ -39,7 +39,8 @@ Test results for each version can be viewed in the `test/` folder.
 
 ## Future improvements
 Improve the search efficiency to improve nodes per soconds:
-1. Transposition tables (allow IDS to reuse work across depths)
+1. Transposition tables
+    - currently, I keep evaluating identical positions, TT allow IDS to reuse work across depths
 2. Killer move heuristics
 3. History heuristics
 4. Null move pruning
