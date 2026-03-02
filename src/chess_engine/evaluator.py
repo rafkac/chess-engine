@@ -359,6 +359,18 @@ class ClassicEvaluator:
                 mg_score -= passed_mg[7 - rank]
                 eg_score -= passed_eg[7 - rank]
 
+        # bishop pair bonus
+        bishop_pair_bonus = 30
+        white_bishops = len(board.pieces(chess.BISHOP, chess.WHITE))
+        black_bishops = len(board.pieces(chess.BISHOP, chess.BLACK))
+        
+        if white_bishops == 2:
+            mg_score += bishop_pair_bonus
+            eg_score += bishop_pair_bonus
+        if black_bishops == 2:
+            mg_score -= bishop_pair_bonus
+            eg_score -= bishop_pair_bonus
+
 
         # Tapered evaluation formula
         # Total phase is roughly 24 (4*N + 4*B + 4*R + 2*Q). 
