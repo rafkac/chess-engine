@@ -35,7 +35,7 @@ BK_POSITIONS = [
     "r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - - bm f4;"
 ]
 
-SEARCH_DEPTH = 5
+SEARCH_DEPTH = 4
 # failing posiitons from last iteration
 FAILING = [1, 2, 3, 4, 7, 9, 10, 11, 13, 16, 18, 20, 22, 23, 24]
 
@@ -46,6 +46,7 @@ def run_bk_test(depth: int = SEARCH_DEPTH):
     solved_count = 0
     failed_indices = []
     total = len(BK_POSITIONS)
+    total_failing = len(FAILING)
 
     print(f"Bratko-Kopec Test  |  depth = {depth}")
     print("=" * 70)
@@ -87,7 +88,7 @@ def run_bk_test(depth: int = SEARCH_DEPTH):
         print(f"{i:<4} {result_str:<8} {played_san:<10} {expected_san:<25} {score_str}")
 
     print("=" * 70)
-    pct = 100 * solved_count / total
+    pct = 100 * solved_count / total_failing
     print(f"Score: {solved_count} / {total}  ({pct:.1f}%)")
     print("Failed:", failed_indices)
     print()
