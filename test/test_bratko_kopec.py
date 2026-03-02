@@ -1,5 +1,4 @@
 import chess
-import chess.engine
 from chess_engine.evaluator import ClassicEvaluator
 from chess_engine.search import SearchEngine
 
@@ -37,12 +36,15 @@ BK_POSITIONS = [
 ]
 
 SEARCH_DEPTH = 5
+# failing posiitons from last iteration
+FAILING = [1, 2, 3, 4, 7, 9, 10, 11, 13, 16, 18, 20, 22, 23, 24]
 
 def run_bk_test(depth: int = SEARCH_DEPTH):
     evaluator = ClassicEvaluator()
     engine = SearchEngine(evaluator)
 
     solved_count = 0
+    failed_indices = []
     total = len(BK_POSITIONS)
 
     print(f"Bratko-Kopec Test  |  depth = {depth}")
@@ -50,7 +52,8 @@ def run_bk_test(depth: int = SEARCH_DEPTH):
     print(f"{'#':<4} {'Result':<8} {'Played':<10} {'Expected':<25} {'Score'}")
     print("-" * 70)
 
-    for i, epd in enumerate(BK_POSITIONS, 1):
+    filtered_positions = [(i, BK_POSITIONS[i-1]) for i in FAILING]
+    for i, epd in filtered_positions:
         board = chess.Board()
 
         # Parse EPD → board state + operations dict.
@@ -73,6 +76,8 @@ def run_bk_test(depth: int = SEARCH_DEPTH):
         solved = best_move in expected_moves
         if solved:
             solved_count += 1
+        else:
+            failed_indices.append(i)
 
         played_san   = board.san(best_move) if best_move else "None"
         expected_san = ", ".join(board.san(m) for m in expected_moves)
@@ -84,6 +89,7 @@ def run_bk_test(depth: int = SEARCH_DEPTH):
     print("=" * 70)
     pct = 100 * solved_count / total
     print(f"Score: {solved_count} / {total}  ({pct:.1f}%)")
+    print("Failed:", failed_indices)
     print()
 
     # Rough rating estimate based on published BK benchmarks
