@@ -56,3 +56,5 @@ Most immediate clear improvement will happen with implementing transposiiton tab
 **version 1.2** - added pawn structure parameters  
 **version 1.3** - added tempo bonus (+15 centipawns)  
 **version 2.0** - added search with move ordering, quiescence based on minimax with alpha-beta pruning 
+**version 2.1** - implemented time-limited search (rather than depth limit), sped up evaluation with direct lookup of big dictionary for piece-square tables
+ 
