@@ -1,6 +1,6 @@
 import chess
 
-class ClassicEvaluator:
+class OldEvaluator:
     def __init__(self):
         # -------------------------------------------------------------------------
         # PeSTO Piece-Square Tables (Midgame and Endgame)
