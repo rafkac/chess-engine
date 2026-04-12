@@ -1,5 +1,4 @@
 import chess
-import chess.polyglot
 import time
 
 class SearchEngine:
@@ -8,36 +7,16 @@ class SearchEngine:
         self.nodes_visited = 0
         self.best_move = None
 
-        # Transposition Table
-        self.tt = {}
-        self.TT_EXACT = 0  # exact score (PV node)
-        self.TT_LOWER = 1  # fail-high (alpha raised, score >= beta)
-        self.TT_UPPER = 2  # fail-low (beta lowered, score <= alpha)
-        
-        # TT Statistics for monitoring
-        self.tt_hits = 0
-        self.tt_probes = 0
-        self.tt_cutoffs = 0
-        
         # move ordering heuristics
         self.piece_values = {
             chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, 
             chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0
         }
 
-    def clear_tt(self):
-        """Clear transposition table (optional between games)"""
-        self.tt.clear()
-        self.tt_hits = 0
-        self.tt_probes = 0
-        self.tt_cutoffs = 0
-
-
-    def order_moves(self, board, moves, tt_move=None):
+    def order_moves(self, board, moves):
         """
         Sorts moves to improve Alpha-Beta pruning
-        Order priority:
-        1. TT move (best move from previous search at this position)
+        Order:
         1. Captures (ordered by value difference)
         2. Promotions
         3. Quiet moves
@@ -45,11 +24,6 @@ class SearchEngine:
         score_moves = []
         for move in moves:
             score = 0
-
-            # 0. TT move gets highest priority
-            if tt_move and move == tt_move:
-                score = 10000
-                        
             # 1. Captures
             if board.is_capture(move):
                 # MVV-LVA logic
@@ -119,41 +93,7 @@ class SearchEngine:
             return beta
 
     def minimax(self, board, depth, alpha, beta):
-        """
-        Minimax with alpha-beta pruning and transposition table
-        """
         self.nodes_visited += 1
-
-        alpha_orig = alpha
-	
-        # === TRANSPOSITION TABLE PROBE ===
-        # Uses chess.polyglot.zobrist_hash()
-        zobrist = chess.polyglot.zobrist_hash(board)
-        tt_move = None
-        self.tt_probes += 1
-        
-        if zobrist in self.tt:
-            tt_depth, tt_score, tt_flag, tt_move_stored = self.tt[zobrist]
-            
-            # Only use TT entry if it was searched to at least the same depth
-            if tt_depth >= depth:
-                self.tt_hits += 1
-                
-                if tt_flag == self.TT_EXACT:
-                    self.tt_cutoffs += 1
-                    return tt_score
-                elif tt_flag == self.TT_LOWER:
-                    alpha = max(alpha, tt_score)
-                elif tt_flag == self.TT_UPPER:
-                    beta = min(beta, tt_score)
-                
-                # Cutoff if bounds crossed
-                if alpha >= beta:
-                    self.tt_cutoffs += 1
-                    return tt_score
-            
-            # Store TT move for move ordering even if depth is insufficient
-            tt_move = tt_move_stored
 
         # termination condition
         if depth == 0:
@@ -170,12 +110,9 @@ class SearchEngine:
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
 
-        # move generation with TT move priority
-        moves = self.order_moves(board, list(board.legal_moves), tt_move)
+        # move Generation
+        moves = self.order_moves(board, list(board.legal_moves))
 
-        best_move_this_node = None
-
-        # === SEARCH ===
         # white maximising
         if board.turn == chess.WHITE:
             max_eval = -float('inf')
@@ -184,23 +121,12 @@ class SearchEngine:
                 eval_score = self.minimax(board, depth - 1, alpha, beta)
                 board.pop()
                 
-                if eval_score > max_eval:
-                    max_eval = eval_score
-                    best_move_this_node = move
+                max_eval = max(max_eval, eval_score)
                 alpha = max(alpha, eval_score)
                 
                 # beta cutoff
                 if beta <= alpha:
                     break
-	
-            # Store in transposition table
-            tt_flag = self.TT_EXACT
-            if max_eval <= alpha_orig:
-                tt_flag = self.TT_UPPER
-            elif max_eval >= beta:
-                tt_flag = self.TT_LOWER
-            self.tt[zobrist] = (depth, max_eval, tt_flag, best_move_this_node)
-                            
             return max_eval
 
         # black minimising
@@ -211,8 +137,7 @@ class SearchEngine:
                 eval_score = self.minimax(board, depth - 1, alpha, beta)
                 board.pop()
                 
-                if eval_score < min_eval:
-                    min_eval = eval_score
+                min_eval = min(min_eval, eval_score)
                 beta = min(beta, eval_score)
                 
                 # alpha cutoff
@@ -223,24 +148,12 @@ class SearchEngine:
     def get_best_move(self, board, depth=3):
         self.nodes_visited = 0
         self.best_move = None
-        self.tt_hits = 0
-        self.tt_probes = 0
-        self.tt_cutoffs = 0
-
         start_time = time.time()
         
         alpha = -float('inf')
         beta = float('inf')
-
-
-        # Check TT for best move from previous search
-        zobrist = chess.polyglot.zobrist_hash(board)
-        tt_move = None
-        if zobrist in self.tt:
-            _, _, _, tt_move = self.tt[zobrist]
-
-
-        moves = self.order_moves(board, list(board.legal_moves), tt_move)
+        
+        moves = self.order_moves(board, list(board.legal_moves))
         
         if board.turn == chess.WHITE:
             best_val = -float('inf')

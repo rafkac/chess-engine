@@ -2,23 +2,23 @@ import chess
 from chess_engine.evaluator import ClassicEvaluator
 from chess_engine.search import SearchEngine
 # from main import ChessBot
-from chess_engine.old_evaluator import OldEvaluator
+from chess_engine.evaluator import ClassicEvaluator
+from chess_engine.search import SearchEngine
 from chess_engine.search_timed import SearchEngineTimed
-
-
-# Standard opening positions (after 4-6 moves)
-openings = [
-    ("Starting", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-    # ("Italian", "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3")
-    ("Sicilian", "rnbqkb1r/pp1ppppp/5n2/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"),
-    ("French", "rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3"),
-    ("Caro-Kann", "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3")
-    # ("Queen's Gambit", "rnbqkb1r/ppp1pppp/5n2/3p4/2PP4/8/PP2PPPP/RNBQKBR w KQkq - 1 3")
-]
 
 
 def simulate_match(engine_old, engine_new):
     """Play from multiple different openings"""
+    # Standard opening positions (after 4-6 moves)
+    openings = [
+        ("Starting", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        ("Italian", "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"),
+        ("Sicilian", "rnbqkb1r/pp1ppppp/5n2/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"),
+        ("French", "rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3"),
+        ("Caro-Kann", "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3"),
+        ("Queen's Gambit", "rnbqkb1r/ppp1pppp/5n2/3p4/2PP4/8/PP2PPPP/RNBQKBR w KQkq - 1 3"),
+    ]
+    
     results = {"new": 0, "old": 0, "draws": 0}
     
     for _, fen in openings:
@@ -61,7 +61,7 @@ def play_game(white_engine, black_engine, start_fen):
 
 
 if __name__ == "__main__":
-    # evaluator_old = OldEvaluator()  # old version
+    # evaluator_old = ClassicEvaluator()  # old version
     # evaluator_new = ClassicEvaluator()     # new version
     
     # engine_old = SearchEngine(evaluator_old)
@@ -100,7 +100,7 @@ if __name__ == "__main__":
             print("-" * 20)
             print("White bot...")
 
-            best_move, nodes, time = search.get_best_move(board, depth=4) 
+            best_move, score, nodes, time = search_timed.get_best_move(board, time_limit=5.0) # time limit
             white['nodes'] += nodes
             white['time'] += time
             board.push(best_move)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
             # AI Turn
             print("Black bot...")
 
-            best_move, nodes, time = search.get_best_move(board, depth=4) 
+            best_move, score, nodes, time = search_timed.get_best_move_depth(board, depth=3) # depth limit
             black['nodes'] += nodes
             black['time'] += time
             board.push(best_move)
