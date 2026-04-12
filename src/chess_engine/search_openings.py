@@ -2,6 +2,12 @@ import chess
 import chess.polyglot
 import time
 
+
+"""
+search with opening book implementation
+"""
+
+
 class SearchEngine:
     def __init__(self, evaluator):
         self.evaluator = evaluator
