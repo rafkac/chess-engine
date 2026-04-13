@@ -1,6 +1,6 @@
 """
-Match simulation: pits the NEW engine (ClassicEvaluator) against the OLD engine
-(OldEvaluator) over a set of opening positions, playing each opening twice
+Match simulation: pits two engine configurations against each other
+over a set of opening positions, playing each opening twice
 (swapping colours) for fairness.
 
 Usage:
@@ -22,11 +22,33 @@ import chess
 from chess_engine.evaluator import ClassicEvaluator
 from chess_engine.old_evaluator import OldEvaluator
 from chess_engine.search import SearchEngine
+from chess_engine.search_open_book import SearchEngineWithOpenings
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# PLAYER CONFIGURATION
+# Change these to swap evaluators / search engines for future experiments.
+# Each player dict has:
+#   "label"     – short name shown in output
+#   "evaluator" – callable that returns an evaluator instance
+#   "search"    – callable(evaluator) that returns a search engine instance
+# ─────────────────────────────────────────────────────────────────────────
+PLAYER_1 = {
+    "label": "OLD",
+    "evaluator": ClassicEvaluator,
+    "search": SearchEngine,
+}
+
+PLAYER_2 = {
+    "label": "NEW (opening book)",
+    "evaluator": ClassicEvaluator,
+    "search": SearchEngineWithOpenings,
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────
 # Opening book – a diverse set of common positions after 3-5 moves.
-# Each opening is played twice (new=white, then new=black).
+# Each opening is played twice (player2=white, then player2=black).
 # ─────────────────────────────────────────────────────────────────────────
 OPENINGS = [
     ("Starting Position",
@@ -67,10 +89,17 @@ OPENINGS = [
 ]
 
 
+# helper: build an engine from a player config dict
+def build_engine(player_cfg):
+    evaluator = player_cfg["evaluator"]()
+    engine = player_cfg["search"](evaluator)
+    return engine
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Single-game driver
 # ─────────────────────────────────────────────────────────────────────────
-def play_game(white_engine, black_engine, start_fen, max_moves=200, verbose=False):
+def play_game(white_engine, black_engine, start_fen, depth, max_moves=200, verbose=False):
     """
     Play one full game and return the result from White's perspective.
 
@@ -86,7 +115,7 @@ def play_game(white_engine, black_engine, start_fen, max_moves=200, verbose=Fals
 
     while not board.is_game_over() and half_moves < max_moves * 2:
         engine = white_engine if board.turn == chess.WHITE else black_engine
-        move, _score, _elapsed = engine.get_best_move(board, depth=engine._match_depth)
+        move, _score, _elapsed = engine.get_best_move(board, depth=depth)
         if move is None:
             break
         if verbose:
@@ -103,7 +132,6 @@ def play_game(white_engine, black_engine, start_fen, max_moves=200, verbose=Fals
 
     # determine outcome
     if board.is_checkmate():
-        # the side to move is mated, so the other side won
         if board.turn == chess.WHITE:
             return -1, "checkmate (black wins)", half_moves
         else:
@@ -129,25 +157,24 @@ def play_game(white_engine, black_engine, start_fen, max_moves=200, verbose=Fals
 # ─────────────────────────────────────────────────────────────────────────
 # Match simulation
 # ─────────────────────────────────────────────────────────────────────────
-def run_match(depth=3, max_moves=200, verbose=False):
-    # build engines
-    new_eval = ClassicEvaluator()
-    old_eval = OldEvaluator()
-    new_engine = SearchEngine(new_eval)
-    old_engine = SearchEngine(old_eval)
-    new_engine._match_depth = depth
-    old_engine._match_depth = depth
+def run_match(depth=4, max_moves=200, verbose=False):
+    # build engines from global config
+    p1_engine = build_engine(PLAYER_1)
+    p2_engine = build_engine(PLAYER_2)
+
+    p1_label = PLAYER_1["label"]
+    p2_label = PLAYER_2["label"]
 
     total_games = len(OPENINGS) * 2  # each opening played twice
     results = {
-        "new_wins": 0,
-        "old_wins": 0,
+        "p2_wins": 0,
+        "p1_wins": 0,
         "draws": 0,
     }
     game_log = []
 
     print("=" * 72)
-    print(f"  MATCH: NEW (ClassicEvaluator) vs OLD (OldEvaluator)")
+    print(f"  MATCH: Player 1 [{p1_label}]  vs  Player 2 [{p2_label}]")
     print(f"  Search depth: {depth}  |  Max moves/game: {max_moves}")
     print(f"  Openings: {len(OPENINGS)}  |  Total games: {total_games}")
     print("=" * 72)
@@ -157,43 +184,44 @@ def run_match(depth=3, max_moves=200, verbose=False):
     game_num = 0
 
     for opening_name, fen in OPENINGS:
-        for new_color in ["white", "black"]:
+        # Player 2 plays white first, then black
+        for p2_color in ["white", "black"]:
             game_num += 1
 
-            if new_color == "white":
-                white_eng, black_eng = new_engine, old_engine
-                white_label, black_label = "NEW", "OLD"
+            if p2_color == "white":
+                white_eng, black_eng = p2_engine, p1_engine
+                white_label, black_label = p2_label, p1_label
             else:
-                white_eng, black_eng = old_engine, new_engine
-                white_label, black_label = "OLD", "NEW"
+                white_eng, black_eng = p1_engine, p2_engine
+                white_label, black_label = p1_label, p2_label
 
             print(f"Game {game_num}/{total_games}: {opening_name}  "
                   f"[W={white_label} vs B={black_label}]")
 
             t0 = time.time()
             result, reason, moves = play_game(
-                white_eng, black_eng, fen, max_moves, verbose
+                white_eng, black_eng, fen, depth, max_moves, verbose
             )
             elapsed = time.time() - t0
 
-            # translate result to new/old perspective
-            if new_color == "white":
+            # translate result to p2/p1 perspective
+            if p2_color == "white":
                 if result == 1:
-                    outcome = "NEW wins"
-                    results["new_wins"] += 1
+                    outcome = f"{p2_label} wins"
+                    results["p2_wins"] += 1
                 elif result == -1:
-                    outcome = "OLD wins"
-                    results["old_wins"] += 1
+                    outcome = f"{p1_label} wins"
+                    results["p1_wins"] += 1
                 else:
                     outcome = "Draw"
                     results["draws"] += 1
-            else:  # new is black
+            else:  # p2 is black
                 if result == -1:
-                    outcome = "NEW wins"
-                    results["new_wins"] += 1
+                    outcome = f"{p2_label} wins"
+                    results["p2_wins"] += 1
                 elif result == 1:
-                    outcome = "OLD wins"
-                    results["old_wins"] += 1
+                    outcome = f"{p1_label} wins"
+                    results["p1_wins"] += 1
                 else:
                     outcome = "Draw"
                     results["draws"] += 1
@@ -201,7 +229,7 @@ def run_match(depth=3, max_moves=200, verbose=False):
             game_log.append({
                 "game": game_num,
                 "opening": opening_name,
-                "new_color": new_color,
+                "p2_color": p2_color,
                 "outcome": outcome,
                 "reason": reason,
                 "moves": moves // 2,  # full moves
@@ -221,58 +249,58 @@ def run_match(depth=3, max_moves=200, verbose=False):
     print()
 
     # per-game table
-    print(f"{'#':<4} {'Opening':<24} {'New as':<7} {'Outcome':<10} "
+    print(f"{'#':<4} {'Opening':<24} {'P2 as':<7} {'Outcome':<28} "
           f"{'Reason':<28} {'Moves':<6} {'Time':<6}")
-    print("-" * 90)
+    print("-" * 105)
     for g in game_log:
-        print(f"{g['game']:<4} {g['opening']:<24} {g['new_color']:<7} "
-              f"{g['outcome']:<10} {g['reason']:<28} {g['moves']:<6} "
+        print(f"{g['game']:<4} {g['opening']:<24} {g['p2_color']:<7} "
+              f"{g['outcome']:<28} {g['reason']:<28} {g['moves']:<6} "
               f"{g['time']:<6.1f}s")
-    print("-" * 90)
+    print("-" * 105)
     print()
 
     # aggregate
-    new_w = results["new_wins"]
-    old_w = results["old_wins"]
+    p2_w = results["p2_wins"]
+    p1_w = results["p1_wins"]
     draws = results["draws"]
 
     # Elo-style score: win=1, draw=0.5, loss=0
-    new_score = new_w + 0.5 * draws
-    old_score = old_w + 0.5 * draws
+    p2_score = p2_w + 0.5 * draws
+    p1_score = p1_w + 0.5 * draws
 
-    print(f"  NEW engine:  {new_w} wins  |  score: {new_score:.1f} / {total_games}")
-    print(f"  OLD engine:  {old_w} wins  |  score: {old_score:.1f} / {total_games}")
-    print(f"  Draws:       {draws}")
+    print(f"  Player 1 [{p1_label}]:  {p1_w} wins  |  score: {p1_score:.1f} / {total_games}")
+    print(f"  Player 2 [{p2_label}]:  {p2_w} wins  |  score: {p2_score:.1f} / {total_games}")
+    print(f"  Draws:                   {draws}")
     print()
 
     # win percentages
-    new_pct = 100 * new_score / total_games
-    old_pct = 100 * old_score / total_games
-    print(f"  NEW win rate: {new_pct:.1f}%")
-    print(f"  OLD win rate: {old_pct:.1f}%")
+    p2_pct = 100 * p2_score / total_games
+    p1_pct = 100 * p1_score / total_games
+    print(f"  Player 1 win rate: {p1_pct:.1f}%")
+    print(f"  Player 2 win rate: {p2_pct:.1f}%")
     print()
 
     # Elo difference estimate (logistic model)
-    if 0 < new_pct < 100:
+    if 0 < p2_pct < 100:
         import math
-        elo_diff = -400 * math.log10((1 / (new_score / total_games)) - 1)
-        print(f"  Estimated Elo difference (NEW − OLD): {elo_diff:+.0f}")
-    elif new_pct == 100:
-        print(f"  Estimated Elo difference: NEW is dominant (100% score)")
+        elo_diff = -400 * math.log10((1 / (p2_score / total_games)) - 1)
+        print(f"  Estimated Elo difference (P2 − P1): {elo_diff:+.0f}")
+    elif p2_pct == 100:
+        print(f"  Estimated Elo difference: P2 is dominant (100% score)")
     else:
-        print(f"  Estimated Elo difference: OLD is dominant (0% score for NEW)")
+        print(f"  Estimated Elo difference: P1 is dominant (0% score for P2)")
 
     print()
     print(f"  Total match time: {match_elapsed:.1f}s")
     print()
 
     # verdict
-    if new_w > old_w:
-        print("  ✓ NEW version is STRONGER")
-    elif old_w > new_w:
-        print("  ✗ OLD version was BETTER")
+    if p2_w > p1_w:
+        print(f"  ✓ Player 2 [{p2_label}] is STRONGER")
+    elif p1_w > p2_w:
+        print(f"  ✗ Player 1 [{p1_label}] was BETTER")
     else:
-        print("  ≈ Engines are roughly EQUAL")
+        print(f"  ≈ Engines are roughly EQUAL")
 
     print("=" * 72)
 

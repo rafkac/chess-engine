@@ -110,6 +110,12 @@ class SearchEngine:
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
 
+        # Repetition detection: if the current position has already occurred
+        # in the game history, treat it as a draw. This prevents the engine
+        # from repeating moves and throwing away winning positions.
+        if board.is_repetition(2):
+            return 0
+
         # move Generation
         moves = self.order_moves(board, list(board.legal_moves))
 
