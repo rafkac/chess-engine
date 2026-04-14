@@ -157,7 +157,7 @@ def play_game(white_engine, black_engine, start_fen, depth, max_moves=200, verbo
 # ─────────────────────────────────────────────────────────────────────────
 # Match simulation
 # ─────────────────────────────────────────────────────────────────────────
-def run_match(depth=4, max_moves=200, verbose=False):
+def run_match(depth=3, max_moves=200, verbose=False):
     # build engines from global config
     p1_engine = build_engine(PLAYER_1)
     p2_engine = build_engine(PLAYER_2)
