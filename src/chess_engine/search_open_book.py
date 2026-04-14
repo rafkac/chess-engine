@@ -1,8 +1,9 @@
 import chess
 import chess.polyglot
 import time
+import os
 
-BOOK_PATH = "opening_book/Perfect_2023.bin"
+BOOK_PATH = os.path.join(os.path.dirname(__file__), "..", "opening_book", "Perfect2023.bin")
 
 class SearchEngineWithOpenings:
     def __init__(self, evaluator):
@@ -20,6 +21,7 @@ class SearchEngineWithOpenings:
         try:
             self.book_reader = chess.polyglot.open_reader(BOOK_PATH)
             self.book_available = True
+            print("Opening book loaded successfully.")
         except Exception as e:
             print(f"Could not load opening book: {e}")
             self.book_reader = None
