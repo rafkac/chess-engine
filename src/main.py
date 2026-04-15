@@ -1,12 +1,13 @@
 import chess
 from chess_engine.evaluator import ClassicEvaluator
-from chess_engine.search import SearchEngine
+# from chess_engine.search import SearchEngine
+from chess_engine.search_open_book import SearchEngineWithOpenings
 
 class ChessBot:
     def __init__(self):
         self.board = chess.Board()
         self.evaluator = ClassicEvaluator()
-        self.search_engine = SearchEngine(self.evaluator)
+        self.search_engine = SearchEngineWithOpenings(self.evaluator)
 
     def get_best_move(self, depth=3):
         """

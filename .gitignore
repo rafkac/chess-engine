@@ -18,3 +18,6 @@ TODO.md
 
 # macOS system files
 .DS_Store
+
+# large file (opening book)
+src/opening_book/Cerebellum3Merge.bin
