@@ -24,6 +24,9 @@ from chess_engine.old_evaluator import OldEvaluator
 from chess_engine.search import SearchEngine
 from chess_engine.search_open_book import SearchEngineWithOpenings
 
+#deeper opening
+from chess_engine.search_open_book_deep import SearchEngineWithDeepOpenings
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # PLAYER CONFIGURATION
@@ -34,13 +37,13 @@ from chess_engine.search_open_book import SearchEngineWithOpenings
 #   "search"    – callable(evaluator) that returns a search engine instance
 # ─────────────────────────────────────────────────────────────────────────
 PLAYER_1 = {
-    "label": "OLD",
+    "label": "Perfect2023.bin",
     "evaluator": ClassicEvaluator,
     "search": SearchEngine,
 }
 
 PLAYER_2 = {
-    "label": "NEW (opening book)",
+    "label": "deep Cerebellum3Merge.bin",
     "evaluator": ClassicEvaluator,
     "search": SearchEngineWithOpenings,
 }
@@ -140,8 +143,8 @@ def play_game(white_engine, black_engine, start_fen, depth, max_moves=200, verbo
         return 0, "stalemate", half_moves
     elif board.is_insufficient_material():
         return 0, "insufficient material", half_moves
-    elif board.is_seventyfive_moves():
-        return 0, "75-move rule", half_moves
+    # elif board.is_seventyfive_moves():
+    #     return 0, "75-move rule", half_moves
     elif board.is_fivefold_repetition():
         return 0, "fivefold repetition", half_moves
     elif board.can_claim_threefold_repetition():
@@ -310,7 +313,7 @@ def run_match(depth=3, max_moves=200, verbose=False):
 # ─────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chess engine match simulation")
-    parser.add_argument("--depth", type=int, default=3,
+    parser.add_argument("--depth", type=int, default=4, # default?
                         help="Search depth for both engines (default: 3)")
     parser.add_argument("--max-moves", type=int, default=200,
                         help="Max full moves per game before adjudicating draw (default: 200)")
