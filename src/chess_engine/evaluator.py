@@ -224,6 +224,93 @@ class ClassicEvaluator:
             chess.ROOK: 2, chess.QUEEN: 4, chess.KING: 0
         }
 
+        # =====================================================================
+        # NEW FEATURE WEIGHTS (placeholder — to be tuned via regression)
+        # All values in centipawns. Kept deliberately small so the engine
+        # behaves almost identically before tuning.
+        # =====================================================================
+
+        # --- [NEW 1] King safety: pawn shield ---
+        # Bonus per pawn on the 2nd/3rd rank directly in front of the castled king.
+        # Only evaluated for kings that have castled (on files A-C or F-H).
+        self.mg_pawn_shield = 1          # middlegame bonus per shield pawn
+        self.eg_pawn_shield = 0          # irrelevant in endgame
+
+        # --- [NEW 2] King safety: attack zone pressure ---
+        # Accumulated penalty when enemy pieces attack squares adjacent to the king.
+        # Weights per attacking piece type (heavier pieces count more).
+        self.king_attack_weight = {
+            chess.PAWN: 0, chess.KNIGHT: 1, chess.BISHOP: 1,
+            chess.ROOK: 1, chess.QUEEN: 2, chess.KING: 0
+        }
+        # The raw sum of attack weights is squared and multiplied by this factor.
+        # Quadratic scaling means two attackers are more than twice as dangerous.
+        self.mg_king_zone_factor = 1     # cp per (attack_units²)
+        self.eg_king_zone_factor = 0
+
+        # --- [NEW 3] Rook placement ---
+        self.mg_rook_open_file      = 1  # rook on file with no pawns at all
+        self.eg_rook_open_file      = 1
+        self.mg_rook_semi_open_file = 1  # rook on file with no friendly pawns
+        self.eg_rook_semi_open_file = 0
+        self.mg_rook_seventh_rank   = 1  # rook on the 7th (2nd for black)
+        self.eg_rook_seventh_rank   = 1
+
+        # --- [NEW 4] Pawn structure: backward pawns ---
+        # A backward pawn: no friendly pawn on adjacent files can advance to
+        # support it, and the stop square is controlled by an enemy pawn.
+        self.mg_backward_penalty = 1
+        self.eg_backward_penalty = 1
+
+        # --- [NEW 5] Pawn structure: connected pawns ---
+        # A pawn defended by another friendly pawn (diagonally).
+        self.mg_connected_bonus = 1
+        self.eg_connected_bonus = 1
+
+        # --- [NEW 6] Knight outposts ---
+        # A knight on rank 4-6 (white) / 3-5 (black) that cannot be attacked
+        # by any enemy pawn, and is supported by a friendly pawn.
+        self.mg_knight_outpost = 1
+        self.eg_knight_outpost = 1
+
+        # --- [NEW 7] Bad bishop ---
+        # Penalty per own pawn on the same colour square as own bishop.
+        self.mg_bad_bishop_penalty = 1   # per pawn on same colour
+        self.eg_bad_bishop_penalty = 1
+
+        # --- [NEW 8] King-passer proximity (endgame) ---
+        # In the endgame, the friendly king should escort its own passed pawns
+        # and the enemy king should be far from them. Measured in file+rank
+        # distance (Chebyshev / king-move distance).
+        self.eg_king_friend_passer  = 1  # bonus: own king close to own passer
+        self.eg_king_enemy_passer   = 1  # bonus: enemy king far from our passer
+
+        # =====================================================================
+        # Pre-built helper data for king zone lookup
+        # king_zone[sq] = SquareSet of the 8 squares surrounding sq (+ sq itself)
+        # =====================================================================
+        self.king_zone = []
+        for sq in range(64):
+            zone = chess.SquareSet()
+            kr = chess.square_rank(sq)
+            kf = chess.square_file(sq)
+            for dr in [-1, 0, 1]:
+                for df in [-1, 0, 1]:
+                    r2 = kr + dr
+                    f2 = kf + df
+                    if 0 <= r2 <= 7 and 0 <= f2 <= 7:
+                        zone.add(chess.square(f2, r2))
+            self.king_zone.append(zone)
+
+        # Squares that are "light" (True) or "dark" (False).
+        # A square is light if (file + rank) is even in chess convention.
+        # chess.square_file(sq) + chess.square_rank(sq) even → light square
+        self.is_light_square = [
+            (chess.square_file(sq) + chess.square_rank(sq)) % 2 == 0
+            for sq in range(64)
+        ]
+
+
     def evaluate(self, board: chess.Board):
         """
         Returns a decimal score from the perspective of White.
@@ -269,7 +356,7 @@ class ClassicEvaluator:
                 game_phase += self.game_phase_inc[pt]
 
 
-        # Moblitiy bonuses
+        # Mobility bonuses
         mobility_bonus = {
             chess.KNIGHT: 4, # 4cp per square
             chess.BISHOP: 5,
@@ -301,9 +388,13 @@ class ClassicEvaluator:
 
         # passed pawns bonuses (by rank)
         passed_mg = [0, 5, 10, 20, 35, 60, 100, 0]
-        passed_eg = [0, 10, 20, 40, 70, 120, 200, 0]     
+        passed_eg = [0, 10, 20, 40, 70, 120, 200, 0]
 
-        # whte pawns
+        # Track passed pawns for king-passer proximity (NEW 8)
+        white_passers = []
+        black_passers = []
+
+        # white pawns
         for square in board.pieces(chess.PAWN, chess.WHITE):
             file = chess.square_file(square)
             rank = chess.square_rank(square)
@@ -330,6 +421,42 @@ class ClassicEvaluator:
             if is_passed:
                 mg_score += passed_mg[rank]
                 eg_score += passed_eg[rank]
+                white_passers.append(square)
+
+            # --- [NEW 4] BACKWARD pawns ---
+            # A pawn is backward if:
+            #   1) no friendly pawn on adjacent files is on the same rank or behind
+            #      (i.e. it can't be supported by advancing a neighbouring pawn)
+            #   2) the stop square (one square ahead) is controlled by an enemy pawn
+            if adjacent_files_mask:
+                ranks_behind_or_equal = (1 << (8 * (rank + 1))) - 1
+                has_support = (white_pawns_bb & adjacent_files_mask & ranks_behind_or_equal) != 0
+                if not has_support:
+                    stop_sq = square + 8  # one rank ahead for white
+                    if stop_sq <= 63:
+                        # is stop square attacked by an enemy pawn?
+                        stop_file = chess.square_file(stop_sq)
+                        stop_rank = chess.square_rank(stop_sq)
+                        # enemy pawn attacks stop_sq from rank+1 on adjacent files
+                        left_attacker = chess.square(stop_file - 1, stop_rank + 1) if stop_file > 0 and stop_rank < 7 else None
+                        right_attacker = chess.square(stop_file + 1, stop_rank + 1) if stop_file < 7 and stop_rank < 7 else None
+                        enemy_controls_stop = False
+                        if left_attacker is not None and board.piece_at(left_attacker) == chess.Piece(chess.PAWN, chess.BLACK):
+                            enemy_controls_stop = True
+                        if right_attacker is not None and board.piece_at(right_attacker) == chess.Piece(chess.PAWN, chess.BLACK):
+                            enemy_controls_stop = True
+                        if enemy_controls_stop:
+                            mg_score -= self.mg_backward_penalty
+                            eg_score -= self.eg_backward_penalty
+
+            # --- [NEW 5] CONNECTED pawns ---
+            # Check if this pawn is defended by a friendly pawn (diagonally behind).
+            defend_left  = chess.square(file - 1, rank - 1) if file > 0 and rank > 0 else None
+            defend_right = chess.square(file + 1, rank - 1) if file < 7 and rank > 0 else None
+            if (defend_left is not None and board.piece_at(defend_left) == chess.Piece(chess.PAWN, chess.WHITE)) or \
+               (defend_right is not None and board.piece_at(defend_right) == chess.Piece(chess.PAWN, chess.WHITE)):
+                mg_score += self.mg_connected_bonus
+                eg_score += self.eg_connected_bonus
 
         # black pawns
         for square in board.pieces(chess.PAWN, chess.BLACK):
@@ -358,6 +485,35 @@ class ClassicEvaluator:
             if is_passed:
                 mg_score -= passed_mg[7 - rank]
                 eg_score -= passed_eg[7 - rank]
+                black_passers.append(square)
+
+            # --- [NEW 4] BACKWARD pawns (black) ---
+            if adjacent_files_mask:
+                ranks_above_or_equal = ~((1 << (8 * rank)) - 1) & 0xFFFFFFFFFFFFFFFF
+                has_support = (black_pawns_bb & adjacent_files_mask & ranks_above_or_equal) != 0
+                if not has_support:
+                    stop_sq = square - 8  # one rank ahead for black (downward)
+                    if stop_sq >= 0:
+                        stop_file = chess.square_file(stop_sq)
+                        stop_rank = chess.square_rank(stop_sq)
+                        left_attacker = chess.square(stop_file - 1, stop_rank - 1) if stop_file > 0 and stop_rank > 0 else None
+                        right_attacker = chess.square(stop_file + 1, stop_rank - 1) if stop_file < 7 and stop_rank > 0 else None
+                        enemy_controls_stop = False
+                        if left_attacker is not None and board.piece_at(left_attacker) == chess.Piece(chess.PAWN, chess.WHITE):
+                            enemy_controls_stop = True
+                        if right_attacker is not None and board.piece_at(right_attacker) == chess.Piece(chess.PAWN, chess.WHITE):
+                            enemy_controls_stop = True
+                        if enemy_controls_stop:
+                            mg_score += self.mg_backward_penalty
+                            eg_score += self.eg_backward_penalty
+
+            # --- [NEW 5] CONNECTED pawns (black) ---
+            defend_left  = chess.square(file - 1, rank + 1) if file > 0 and rank < 7 else None
+            defend_right = chess.square(file + 1, rank + 1) if file < 7 and rank < 7 else None
+            if (defend_left is not None and board.piece_at(defend_left) == chess.Piece(chess.PAWN, chess.BLACK)) or \
+               (defend_right is not None and board.piece_at(defend_right) == chess.Piece(chess.PAWN, chess.BLACK)):
+                mg_score -= self.mg_connected_bonus
+                eg_score -= self.eg_connected_bonus
 
         # bishop pair bonus
         bishop_pair_bonus = 30
@@ -370,6 +526,220 @@ class ClassicEvaluator:
         if black_bishops == 2:
             mg_score -= bishop_pair_bonus
             eg_score -= bishop_pair_bonus
+
+
+        # =================================================================
+        # NEW FEATURES
+        # =================================================================
+
+        # --- [NEW 1] King safety: pawn shield ---
+        # For a castled king (files a-c = queenside, files f-h = kingside),
+        # count friendly pawns on the 2nd and 3rd ranks in front of the king.
+        for color in [chess.WHITE, chess.BLACK]:
+            king_sq = board.king(color)
+            if king_sq is None:
+                continue
+            king_file = chess.square_file(king_sq)
+            king_rank = chess.square_rank(king_sq)
+
+            # Only evaluate shield if king is on a castled-looking position
+            # (files 0-2 or 5-7, on the back two ranks for that colour)
+            is_castled_zone = False
+            if color == chess.WHITE and king_rank <= 1 and (king_file <= 2 or king_file >= 5):
+                is_castled_zone = True
+            elif color == chess.BLACK and king_rank >= 6 and (king_file <= 2 or king_file >= 5):
+                is_castled_zone = True
+
+            if is_castled_zone:
+                shield_count = 0
+                # Check the 3 files around the king (king_file-1, king_file, king_file+1)
+                for f in range(max(0, king_file - 1), min(8, king_file + 2)):
+                    if color == chess.WHITE:
+                        # Pawns on ranks 1,2 (indices 1,2) shield the white king
+                        for r in [1, 2]:
+                            sq = chess.square(f, r)
+                            if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.WHITE):
+                                shield_count += 1
+                    else:
+                        # Pawns on ranks 6,5 (indices 6,5) shield the black king
+                        for r in [6, 5]:
+                            sq = chess.square(f, r)
+                            if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.BLACK):
+                                shield_count += 1
+
+                val_mg = shield_count * self.mg_pawn_shield
+                val_eg = shield_count * self.eg_pawn_shield
+                if color == chess.WHITE:
+                    mg_score += val_mg
+                    eg_score += val_eg
+                else:
+                    mg_score -= val_mg
+                    eg_score -= val_eg
+
+        # --- [NEW 2] King safety: attack zone pressure ---
+        # For each side, count how many enemy pieces attack the king zone.
+        # Use quadratic scaling: danger = factor * (sum_of_weights)²
+        for color in [chess.WHITE, chess.BLACK]:
+            king_sq = board.king(color)
+            if king_sq is None:
+                continue
+            zone = self.king_zone[king_sq]
+            enemy = not color
+            attack_units = 0
+
+            for pt in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
+                for sq in board.pieces(pt, enemy):
+                    piece_attacks = board.attacks(sq)
+                    if piece_attacks & zone:
+                        attack_units += self.king_attack_weight[pt]
+
+            # Quadratic danger
+            danger_mg = self.mg_king_zone_factor * (attack_units * attack_units)
+            danger_eg = self.eg_king_zone_factor * (attack_units * attack_units)
+
+            # This is a penalty for the side whose king is being attacked
+            if color == chess.WHITE:
+                mg_score -= danger_mg
+                eg_score -= danger_eg
+            else:
+                mg_score += danger_mg
+                eg_score += danger_eg
+
+
+        # --- [NEW 3] Rook placement ---
+        for color in [chess.WHITE, chess.BLACK]:
+            sign = 1 if color == chess.WHITE else -1
+            own_pawns = board.occupied_co[color] & board.pawns
+            all_pawns = white_pawns_bb | black_pawns_bb
+
+            for sq in board.pieces(chess.ROOK, color):
+                f = chess.square_file(sq)
+                r = chess.square_rank(sq)
+                file_mask = chess.BB_FILES[f]
+
+                # Open file: no pawns at all on this file
+                if (all_pawns & file_mask) == 0:
+                    mg_score += sign * self.mg_rook_open_file
+                    eg_score += sign * self.eg_rook_open_file
+                # Semi-open file: no friendly pawns on this file
+                elif (own_pawns & file_mask) == 0:
+                    mg_score += sign * self.mg_rook_semi_open_file
+                    eg_score += sign * self.eg_rook_semi_open_file
+
+                # Rook on 7th rank (rank 6 for white, rank 1 for black)
+                if (color == chess.WHITE and r == 6) or (color == chess.BLACK and r == 1):
+                    mg_score += sign * self.mg_rook_seventh_rank
+                    eg_score += sign * self.eg_rook_seventh_rank
+
+
+        # --- [NEW 6] Knight outposts ---
+        # A knight on rank 4-6 (white) / 3-5 (black) that is:
+        #   a) supported by a friendly pawn
+        #   b) cannot be attacked by any enemy pawn (no enemy pawn on adjacent
+        #      files that could advance to reach the knight's rank)
+        for color in [chess.WHITE, chess.BLACK]:
+            sign = 1 if color == chess.WHITE else -1
+            enemy_pawns = black_pawns_bb if color == chess.WHITE else white_pawns_bb
+            friendly_pawns = white_pawns_bb if color == chess.WHITE else black_pawns_bb
+
+            for sq in board.pieces(chess.KNIGHT, color):
+                f = chess.square_file(sq)
+                r = chess.square_rank(sq)
+
+                # Must be in the opponent's half
+                if color == chess.WHITE and r < 3:
+                    continue  # not deep enough
+                if color == chess.BLACK and r > 4:
+                    continue
+
+                # Check: no enemy pawn on adjacent files can attack this square.
+                # For white knight on (f, r): enemy black pawns attack from
+                # (f±1, r+1). So any black pawn on adjacent files at rank > r
+                # could potentially advance to attack.
+                adj_files_mask = 0
+                if f > 0: adj_files_mask |= chess.BB_FILES[f - 1]
+                if f < 7: adj_files_mask |= chess.BB_FILES[f + 1]
+
+                if color == chess.WHITE:
+                    # enemy pawns on adjacent files at rank >= r that could
+                    # advance down to attack: any black pawn on adj files with
+                    # rank > r could reach (f±1, r+1) and attack our knight
+                    ranks_that_threaten = ~((1 << (8 * (r + 1))) - 1)
+                else:
+                    ranks_that_threaten = (1 << (8 * r)) - 1
+
+                can_be_attacked = (enemy_pawns & adj_files_mask & ranks_that_threaten) != 0
+                if can_be_attacked:
+                    continue  # not a safe outpost
+
+                # Is the knight supported by a friendly pawn?
+                if color == chess.WHITE:
+                    sup_left  = chess.square(f - 1, r - 1) if f > 0 and r > 0 else None
+                    sup_right = chess.square(f + 1, r - 1) if f < 7 and r > 0 else None
+                    supported = False
+                    if sup_left is not None and board.piece_at(sup_left) == chess.Piece(chess.PAWN, chess.WHITE):
+                        supported = True
+                    if sup_right is not None and board.piece_at(sup_right) == chess.Piece(chess.PAWN, chess.WHITE):
+                        supported = True
+                else:
+                    sup_left  = chess.square(f - 1, r + 1) if f > 0 and r < 7 else None
+                    sup_right = chess.square(f + 1, r + 1) if f < 7 and r < 7 else None
+                    supported = False
+                    if sup_left is not None and board.piece_at(sup_left) == chess.Piece(chess.PAWN, chess.BLACK):
+                        supported = True
+                    if sup_right is not None and board.piece_at(sup_right) == chess.Piece(chess.PAWN, chess.BLACK):
+                        supported = True
+
+                if supported:
+                    mg_score += sign * self.mg_knight_outpost
+                    eg_score += sign * self.eg_knight_outpost
+
+
+        # --- [NEW 7] Bad bishop ---
+        # For each bishop, count how many own pawns sit on the same colour square.
+        for color in [chess.WHITE, chess.BLACK]:
+            sign = 1 if color == chess.WHITE else -1
+            for bishop_sq in board.pieces(chess.BISHOP, color):
+                bishop_light = self.is_light_square[bishop_sq]
+                bad_pawn_count = 0
+                for pawn_sq in board.pieces(chess.PAWN, color):
+                    if self.is_light_square[pawn_sq] == bishop_light:
+                        bad_pawn_count += 1
+                # Penalty: more own pawns on same colour = worse bishop
+                mg_score -= sign * bad_pawn_count * self.mg_bad_bishop_penalty
+                eg_score -= sign * bad_pawn_count * self.eg_bad_bishop_penalty
+
+
+        # --- [NEW 8] King-passer proximity (endgame-only) ---
+        # In the endgame the king should escort its own passers and
+        # block the opponent's. We use Chebyshev distance (king-move distance).
+        white_king = board.king(chess.WHITE)
+        black_king = board.king(chess.BLACK)
+
+        if white_king is not None and black_king is not None:
+            wk_file = chess.square_file(white_king)
+            wk_rank = chess.square_rank(white_king)
+            bk_file = chess.square_file(black_king)
+            bk_rank = chess.square_rank(black_king)
+
+            for passer in white_passers:
+                pf = chess.square_file(passer)
+                pr = chess.square_rank(passer)
+                # Own king close to own passer: bonus (lower distance = better)
+                friend_dist = max(abs(wk_file - pf), abs(wk_rank - pr))
+                enemy_dist  = max(abs(bk_file - pf), abs(bk_rank - pr))
+                # Bonus = (7 - friend_dist) means closer king → higher bonus
+                eg_score += (7 - friend_dist) * self.eg_king_friend_passer
+                # Bonus = enemy_dist means farther enemy king → higher bonus
+                eg_score += enemy_dist * self.eg_king_enemy_passer
+
+            for passer in black_passers:
+                pf = chess.square_file(passer)
+                pr = chess.square_rank(passer)
+                friend_dist = max(abs(bk_file - pf), abs(bk_rank - pr))
+                enemy_dist  = max(abs(wk_file - pf), abs(wk_rank - pr))
+                eg_score -= (7 - friend_dist) * self.eg_king_friend_passer
+                eg_score -= enemy_dist * self.eg_king_enemy_passer
 
 
         # Tapered evaluation formula
@@ -389,17 +759,3 @@ class ClassicEvaluator:
 
         # return decimal score
         return final_score / 100.0
-
-# Usage Example
-# if __name__ == "__main__":
-#     evaluator = ClassicEvaluator()
-    
-#     # Starting position
-#     board = chess.Board()
-#     print(f"Start Pos: {evaluator.evaluate(board)}")
-
-#     # Make some moves
-#     board.push_san("e4")
-#     board.push_san("d5") # Scandinavian
-#     print(f"After e4 d5: {evaluator.evaluate(board)}")
-    
